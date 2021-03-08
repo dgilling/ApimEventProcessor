@@ -14,36 +14,40 @@ namespace ApimEventProcessor
     {
         public MoesifRequest(JObject request)
         {
-            eventType = (string) request["event_type"];
-            messageId = (string) request["message-id"];
-            method = (string) request["method"];
-            uri = (string) request["uri"];
-            userId = (string) request["user_id"];
-            companyId = (string) request["company_id"];
-            requestHeaders = (string) request["request_headers"];
-            requestBody = (string) request["request_body"];
-            metadata = request["metadata"].ToObject<Dictionary<string, object>>();
+            eventType = JObjectUtil.getString(request, MessageCommonParams.EVENT_TYPE);
+            messageId = JObjectUtil.getString(request, MessageCommonParams.MESSAGE_ID);
+            method = JObjectUtil.getString(request, MessageRequestParams.METHOD);
+            uri = JObjectUtil.getString(request, MessageRequestParams.URI);
+            ipAddress = JObjectUtil.getString(request, MessageRequestParams.IP_ADDR);
+            userId = JObjectUtil.getString(request, MessageRequestParams.USER_ID);
+            companyId = JObjectUtil.getString(request, MessageRequestParams.COMPANY_ID);
+            requestHeaders = JObjectUtil.getString(request, MessageRequestParams.HEADERS);
+            requestBody = JObjectUtil.getString(request, MessageRequestParams.BODY);
+            metadata = JObjectUtil.getObjectDict(request, MessageRequestParams.METADATA);
+            contextRequestUser = JObjectUtil.getStringDefaultVal(request, MessageRequestParams.CONTEXT_USER, null);
         }
 
         public string eventType { get; set; }
         public string messageId { get; set; }
         public string method { get; set; }
         public string uri { get; set; }
+        public string ipAddress { get; set; }
         public string userId { get; set; }
         public string companyId { get; set; }
         public string requestHeaders { get; set; }
         public string requestBody { get; set; }
         public Dictionary<string, object> metadata { get; set; }
+        public string contextRequestUser { get; set; }
     }
     public class MoesifResponse
     {
         public MoesifResponse(JObject response)
         {
-            eventType = (string) response["event_type"];
-            messageId = (string) response["message-id"];
-            statusCode = (string) response["status_code"];
-            responseHeaders = (string) response["response_headers"];
-            responseBody = (string) response["response_body"];
+            eventType = JObjectUtil.getString(response, MessageCommonParams.EVENT_TYPE);
+            messageId = JObjectUtil.getString(response, MessageCommonParams.MESSAGE_ID);
+            statusCode = JObjectUtil.getString(response, MessageResponseParams.STATUS_CODE);
+            responseHeaders = JObjectUtil.getString(response, MessageResponseParams.HEADERS);
+            responseBody = JObjectUtil.getString(response, MessageResponseParams.BODY);
         }
 
         public string eventType { get; set; }
@@ -66,7 +70,8 @@ namespace ApimEventProcessor
         public bool IsRequest { get; set; }
         public HttpRequestMessage HttpRequestMessage { get; set; }
         public HttpResponseMessage HttpResponseMessage { get; set; }
-
+        public string ContextRequestUser {get; set;}
+        public string ContextRequestIpAddress {get; set;}
 
         public static HttpMessage Parse(Stream stream)
         {
@@ -109,10 +114,10 @@ namespace ApimEventProcessor
             // Convert the data into json object
             dynamic jsonObject  = JsonConvert.DeserializeObject(data); 
 
-            if (jsonObject.ContainsKey("event_type") && !String.IsNullOrEmpty((string) jsonObject["event_type"]) && 
-                    jsonObject.ContainsKey("message-id") && !String.IsNullOrEmpty((string) jsonObject["message-id"])) {
-			    
-                if (jsonObject["event_type"] == "request") {
+            if (JObjectUtil.containsKeyWithNonEmptyString(jsonObject, MessageCommonParams.EVENT_TYPE) && 
+                    JObjectUtil.containsKeyWithNonEmptyString(jsonObject, MessageCommonParams.MESSAGE_ID)) 
+            {
+                if (jsonObject[MessageCommonParams.EVENT_TYPE] == MessageTypeParams.REQUEST) {
                     httpMessage.IsRequest = true;
                     MoesifRequest mo_req = new MoesifRequest(jsonObject);
                     httpMessage.MessageId = Guid.Parse(mo_req.messageId);
@@ -123,6 +128,8 @@ namespace ApimEventProcessor
                     request.Properties.Add("ReqHeaders", mo_req.requestHeaders);
                     request.Properties.Add("Metadata", mo_req.metadata);
                     request.Content = new StringContent(mo_req.requestBody);
+                    httpMessage.ContextRequestIpAddress = mo_req.ipAddress;
+                    httpMessage.ContextRequestUser = mo_req.contextRequestUser;
                 } else {
                     httpMessage.IsRequest = false;
                     MoesifResponse mo_res = new MoesifResponse(jsonObject);
@@ -144,6 +151,53 @@ namespace ApimEventProcessor
                 httpMessage.HttpResponseMessage = response;
             }
             return httpMessage;
+        }
+    }
+
+    public class MissingKeyException: Exception {
+        public MissingKeyException(string message): base(message) {
+        }
+    }
+
+    public class JObjectUtil
+    {
+        public static void ensureContainsKey(JObject j, String key)
+        {
+            if (!j.ContainsKey(key))
+                throw new MissingKeyException("Required key missing: " + key);
+        }
+
+        public static String getString(JObject j, String key)
+        {
+            ensureContainsKey(j, key);
+            return (string) j[key];
+        }
+
+        public static String getStringDefaultVal(JObject j, String key, String defaultVal)
+        {
+            String v = defaultVal;
+            try
+            {
+                v = getString(j, key);
+            }
+            catch (Exception){}
+            return v;
+        }
+
+        public static Dictionary<string, object> getObjectDict(JObject j, String key)
+        {
+            ensureContainsKey(j, key);
+            Dictionary<string, object> o = null;
+            try {
+                o = j[key].ToObject<Dictionary<string, object>>();
+            }
+            catch (Exception){}
+            return o;
+        }
+
+        public static Boolean containsKeyWithNonEmptyString(JObject j, String key)
+        {
+            return j.ContainsKey(key) && !String.IsNullOrEmpty(JObjectUtil.getString(j, key));
         }
     }
 }

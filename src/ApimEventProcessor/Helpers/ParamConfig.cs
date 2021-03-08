@@ -5,17 +5,32 @@ namespace ApimEventProcessor.Helpers
     // Environment varilables for configuring Moesif
     public static class MoesifAppParamNames
     {
+        // Required
         public const string APP_ID = "APIMEVENTS-MOESIF-APPLICATION-ID";
+
+        //Optional
         public const string SESSION_TOKEN = "APIMEVENTS-MOESIF-SESSION-TOKEN";
+
+        //Optional
         public const string API_VERSION = "APIMEVENTS-MOESIF-API-VERSION";
+
+        //Optional
+        public const string CONFIG_FETCH_INTERVAL_MINS = "APIMEVENTS-MOESIF-CONFIG-FETCH-INTERVAL";
     }
 
     // Environment varilables for configuring Azure Eventhub and storage account
     public static class AzureAppParamNames
     {
+        // Required
         public const string EVENTHUB_CONN_STRING = "APIMEVENTS-EVENTHUB-CONNECTIONSTRING";
+
+        // Required
         public const string EVENTHUB_NAME = "APIMEVENTS-EVENTHUB-NAME";
+
+        // Required
         public const string STORAGEACCOUNT_NAME = "APIMEVENTS-STORAGEACCOUNT-NAME";
+
+        // Required
         public const string STORAGEACCOUNT_KEY = "APIMEVENTS-STORAGEACCOUNT-KEY";
     }
 
@@ -26,7 +41,9 @@ namespace ApimEventProcessor.Helpers
         
         // Frequency at which Moesif configuration is fetched.
         public const int CONFIG_FETCH_INTERVAL_MINUTES = 5;
-    }    class ParamConfig
+    }    
+    
+    class ParamConfig
     {
         public static string load(string v)
         {
@@ -36,10 +53,28 @@ namespace ApimEventProcessor.Helpers
 
         public static string loadDefaultEmpty(string v)
         {
+            return loadWithDefault(v, "");
+        }
+
+        public static string loadWithDefault(string v, string defaultVal)
+        {
             var val = load(v);
             if (string.IsNullOrWhiteSpace(val))
-                val = "";
+                val = defaultVal;
             return val.Trim();
+        }
+
+        public static int loadWithDefault(string v, int defaultVal)
+        {
+            int ival = defaultVal;
+            try
+            {
+                var val = loadWithDefault(v, "");
+                if (!string.IsNullOrWhiteSpace(val) && (Int32.Parse(val) > 0 ))
+                    ival = Int32.Parse(val);
+            }
+            catch (Exception){}
+            return ival;
         }
 
         public static string loadNonEmpty(string varName)
@@ -50,5 +85,4 @@ namespace ApimEventProcessor.Helpers
             return val.Trim();
         }
     }
-
 }
