@@ -179,7 +179,8 @@ namespace ApimEventProcessor
             try
             {
                 v = getString(j, key);
-            } catch (Exception){}
+            }
+            catch (Exception){}
             return v;
         }
 
@@ -189,7 +190,8 @@ namespace ApimEventProcessor
             Dictionary<string, object> o = null;
             try {
                 o = j[key].ToObject<Dictionary<string, object>>();
-            } catch (Exception){}
+            }
+            catch (Exception){}
             return o;
         }
 
