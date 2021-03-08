@@ -64,7 +64,7 @@ namespace ApimEventProcessor.Helpers
         }
 
         public static string b64Decode(string data){
-            return System.Text.Encoding.ASCII.GetString(
+            return System.Text.Encoding.UTF8.GetString(
                                     Convert.FromBase64String(data));
         }
 

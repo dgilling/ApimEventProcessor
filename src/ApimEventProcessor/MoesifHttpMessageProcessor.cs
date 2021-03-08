@@ -156,7 +156,10 @@ namespace ApimEventProcessor
 
         public void runConfigFreshnessCheck()
         {
-            if (lastWorkerRun.AddMinutes(RunParams.CONFIG_FETCH_INTERVAL_MINUTES) < DateTime.UtcNow)
+            int fetchInterval = ParamConfig.loadWithDefault(
+                                    MoesifAppParamNames.CONFIG_FETCH_INTERVAL_MINS,
+                                    RunParams.CONFIG_FETCH_INTERVAL_MINUTES);
+            if (lastWorkerRun.AddMinutes(fetchInterval) < DateTime.UtcNow)
             {
                 _Logger.LogDebug("Scheduling worker thread. lastWorkerRun=" + lastWorkerRun.ToString("o"));
                 ScheduleWorkerToFetchConfig();
@@ -183,10 +186,12 @@ namespace ApimEventProcessor
             string skey = safeGetHeaderFirstOrDefault(request, _SessionTokenKey);
             string userId = safeGetOrNull(request, UserIdName);
             string companyId = safeGetOrNull(request, CompanyIdName);
+            ContextModel context = genContext(request.ContextRequestUser);
             EventModel moesifEvent = new EventModel()
             {
                 Request = moesifRequest,
                 Response = moesifResponse,
+                Context = context,
                 SessionToken = skey,
                 Tags = null,
                 UserId = userId,
@@ -215,7 +220,7 @@ namespace ApimEventProcessor
                 Verb = h.Method.ToString(),
                 Headers = reqHeaders,
                 ApiVersion = _ApiVersion,
-                IpAddress = null,
+                IpAddress = request.ContextRequestIpAddress,
                 Body = reqBodyWrapper.Item1,
                 TransferEncoding = reqBodyWrapper.Item2
             };
@@ -235,7 +240,7 @@ namespace ApimEventProcessor
             {
                 Time = DateTime.UtcNow,
                 Status = (int) h.StatusCode,
-                IpAddress = Environment.MachineName,
+                IpAddress = null,
                 Headers = respHeaders,
                 Body = respBodyWrapper.Item1,
                 TransferEncoding = respBodyWrapper.Item2
@@ -258,7 +263,7 @@ namespace ApimEventProcessor
                                             string propertyName)
         {
             var p = request.HttpRequestMessage.Properties;
-            return p[propertyName] != null
+            return (p.ContainsKey(propertyName) && p[propertyName] != null)
                     ? (string) p[propertyName] 
                     : null;
         }
@@ -290,6 +295,30 @@ namespace ApimEventProcessor
                             .ToEnumerable()
                             .ToList()
                             .Aggregate((i, j) => i + ", " + j));
+        }
+
+        private ContextModel genContext(String b64EncodedStr)
+        {
+            ContextModel context = null;
+            try {
+                if (!string.IsNullOrWhiteSpace(b64EncodedStr)){
+                    var jStr = BodyUtil.b64Decode(b64EncodedStr);
+                    jStr = jStr.Replace("\r\n", "").Replace("\\", "");
+                    if (!(jStr.Trim().Replace(" ", "") == "{}")) // Empty Json
+                    {
+                        ContextUserModel m = ContextUserModel.deserialize(jStr);
+                        if (null != m)
+                        {
+                            context = new ContextModel();
+                            context.User = m;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex){
+                _Logger.LogWarning("Error extracting context.Request.User: " + ex.Message);
+            }
+            return context;
         }
     }
 }
