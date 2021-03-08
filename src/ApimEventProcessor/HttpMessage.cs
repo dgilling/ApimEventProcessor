@@ -23,7 +23,7 @@ namespace ApimEventProcessor
             companyId = JObjectUtil.getString(request, MessageRequestParams.COMPANY_ID);
             requestHeaders = JObjectUtil.getString(request, MessageRequestParams.HEADERS);
             requestBody = JObjectUtil.getString(request, MessageRequestParams.BODY);
-            metadata = JObjectUtil.getObjectDict(request, MessageRequestParams.METHOD);
+            metadata = JObjectUtil.getObjectDict(request, MessageRequestParams.METADATA);
             contextRequestUser = JObjectUtil.getStringDefaultVal(request, MessageRequestParams.CONTEXT_USER, null);
         }
 
