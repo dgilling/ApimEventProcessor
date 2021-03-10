@@ -34,6 +34,13 @@ namespace ApimEventProcessor.Helpers
         public const string STORAGEACCOUNT_KEY = "APIMEVENTS-STORAGEACCOUNT-KEY";
     }
 
+    public static class AppExecuteParams
+    {
+        // Optional:
+        // This log level May be configured in azure web app config env vars
+        public const string APIMEVENTS_LOG_LEVEL = "APIMEVENTS-LOG-LEVEL";
+    }
+
     public static class RunParams
     {
         // Frequency at which events are checkpointed to Azure Storage.
@@ -41,6 +48,7 @@ namespace ApimEventProcessor.Helpers
         
         // Frequency at which Moesif configuration is fetched.
         public const int CONFIG_FETCH_INTERVAL_MINUTES = 5;
+        
     }    
     
     class ParamConfig

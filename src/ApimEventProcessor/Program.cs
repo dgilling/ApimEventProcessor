@@ -14,7 +14,7 @@ namespace ApimEventProcessor
     {
         static void Main(string[] args)
         {
-            var logger = new ConsoleLogger(LogLevel.Debug);
+            var logger = GetLogger();
             logger.LogInfo("STARTING Moesif API Management Event Processor. Reading environment variables");
             // Load configuration paramaters from Environment
             string eventHubConnectionString = ParamConfig.loadNonEmpty(AzureAppParamNames.EVENTHUB_CONN_STRING);
@@ -51,6 +51,24 @@ namespace ApimEventProcessor
         {
             return string.Format("DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1}",
                 storageAccountName, storageAccountKey);
-        }   
+        }
+
+        // Read loglevel from environment, else use system default.
+        // APIMEVENTS_LOG_LEVEL takes priority over DEFAULT_LOG_LEVEL
+        // if neither are configured, use warning as log level.
+        public static ConsoleLogger GetLogger()
+        {
+            var aloglevelparam = ParamConfig.loadDefaultEmpty(AppExecuteParams.APIMEVENTS_LOG_LEVEL);
+            var logLevel = LogLevelUtil.getLevelFromString(aloglevelparam, LogLevel.Warning);
+            var infoLogger = new ConsoleLogger(LogLevel.Info);
+            infoLogger.LogInfo("Setting loglevel to: [ " 
+                                + logLevel.ToString() 
+                                + " ] | '" + AppExecuteParams.APIMEVENTS_LOG_LEVEL + "': [ "
+                                + aloglevelparam 
+                                + " ]"
+                                );
+            var logger = new ConsoleLogger(logLevel);
+            return logger;
+        }
     }
 }
