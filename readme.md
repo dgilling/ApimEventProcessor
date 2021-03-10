@@ -13,6 +13,8 @@ In order to run this sample you will need a number Environment variables configu
 | APIMEVENTS-MOESIF-APPLICATION-ID | Your Moesif Application Id(aka Collector Application Id) can be found in the Moesif Portal.<br> After signing up for a Moesif account, your Moesif Application Id will be displayed during the onboarding steps<br> Or any time by logging into the Moesif Portal, click on the top right menu, and then clicking ApiKeys or Installation. |  
 | APIMEVENTS-MOESIF-SESSION-TOKEN | Request Header Key containing user's API Token such as "Authorization" or "X-Api-Token"|
 | APIMEVENTS-MOESIF-API-VERSION | API Version to tag the request with such as "v1" or "1.2.1" |
+| APIMEVENTS-LOG-LEVEL | Optional: default log level is `warn`. Set this env varilable to `info` or `debug` to see more logs. Set either in `run.bat` or `Azure app service setting configuration` |
+|  |  |
 
 The sample, as is, writes the HTTP messages to the Moesif API Analytics, however, by creating a new implementation of `IHttpMessageProcessor` it is trivial to change where the HTTP messages are relayed.
 
@@ -38,4 +40,6 @@ The job should immediately begin. View logs to see output.
 
 Troubleshooting:
 1. The maximum size of data sent to log-to-eventhub is limited by azure to approx 200000 chars. So the body size in policy.xml must be limited to below that limit. Log-to-Eventhub truncates at that limit.
+2. Ensure the `policy.xml` matches the correct version of ApimEventProcessor. 
 3. The Checkpoint to azure storage occurs only after CHECKPOINT_MINIMUM_INTERVAL_MINUTES (5 mins) has elapsed and after new event is received. If this program is restarted prior to checkpoint, all events after last checkpoint are sent to Moesif. This may lead to duplicate events in Moesif.
+4. Enable more detailed logs by setting `APIMEVENTS-LOG-LEVEL` environment variable to `debug` or `info` from default `warn`
