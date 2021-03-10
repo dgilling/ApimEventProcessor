@@ -14,8 +14,9 @@ namespace ApimEventProcessor
     {
         static void Main(string[] args)
         {
+            var infoLogger = new ConsoleLogger(LogLevel.Info);
+            infoLogger.LogInfo("STARTING Moesif API Management Event Processor. Reading environment variables");
             var logger = GetLogger();
-            logger.LogInfo("STARTING Moesif API Management Event Processor. Reading environment variables");
             // Load configuration paramaters from Environment
             string eventHubConnectionString = ParamConfig.loadNonEmpty(AzureAppParamNames.EVENTHUB_CONN_STRING);
             string eventHubName = ParamConfig.loadNonEmpty(AzureAppParamNames.EVENTHUB_NAME); 
