@@ -99,7 +99,7 @@ namespace ApimEventProcessor
             var completedMessages = RemoveCompletedMessages();
             if (completedMessages.Count > 0)
             {
-                _Logger.LogDebug("Sending completed Messages to Moesif. Count: [" + completedMessages.Count + "]");
+                _Logger.LogInfo("Sending completed Messages to Moesif. Count: [" + completedMessages.Count + "]");
                 var moesifEvents = await BuildMoesifEvents(completedMessages);
                 // Send async to Moesif. To send synchronously, use CreateEventsBatch instead
                 await _MoesifClient.Api.CreateEventsBatchAsync(moesifEvents);
@@ -176,7 +176,7 @@ namespace ApimEventProcessor
         From Http request and response, construct the moesif EventModel
         */
         public async Task<EventModel> BuildMoesifEvent(HttpMessage request, HttpMessage response){
-            _Logger.LogDebug("Building Moesif event");
+            _Logger.LogDebug("Building Moesif event: [" + request.MessageId + "]");
             EventRequestModel moesifRequest = await genEventRequestModel(request,
                                                                         ReqHeadersName,
                                                                         RequestTimeName,

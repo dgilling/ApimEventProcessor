@@ -50,7 +50,7 @@ namespace ApimEventProcessor
             foreach (EventData eventData in messages)
             {
                 var evt = displayableEvent(context, eventData);
-                _Logger.LogInfo("Event received: " + evt);
+                _Logger.LogDebug("Event received: " + evt);
                 try
                 {
                     var httpMessage = HttpMessage.Parse(eventData.GetBodyStream());
