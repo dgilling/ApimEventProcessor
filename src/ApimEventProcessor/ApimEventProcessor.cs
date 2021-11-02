@@ -87,7 +87,9 @@ namespace ApimEventProcessor
                                                 evt.Offset,
                                                 evt.PartitionKey);
             }
-            catch (Exception){}
+            catch (Exception ex){
+                Console.WriteLine("Exception in displayableEvent: " + ex.Message);
+            }
             return t;
         }
 
