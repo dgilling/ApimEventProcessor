@@ -25,6 +25,7 @@ namespace ApimEventProcessor
             requestBody = JObjectUtil.getString(request, MessageRequestParams.BODY);
             metadata = JObjectUtil.getObjectDict(request, MessageRequestParams.METADATA);
             contextRequestUser = JObjectUtil.getStringDefaultVal(request, MessageRequestParams.CONTEXT_USER, null);
+            contextTimestamp = JObjectUtil.getDatetimeDefaultUtcNow(request, MessageCommonParams.CONTEXT_TIMESTAMP);
         }
 
         public string eventType { get; set; }
@@ -38,6 +39,7 @@ namespace ApimEventProcessor
         public string requestBody { get; set; }
         public Dictionary<string, object> metadata { get; set; }
         public string contextRequestUser { get; set; }
+        public DateTime contextTimestamp { get; set; }
     }
     public class MoesifResponse
     {
@@ -48,6 +50,7 @@ namespace ApimEventProcessor
             statusCode = JObjectUtil.getString(response, MessageResponseParams.STATUS_CODE);
             responseHeaders = JObjectUtil.getString(response, MessageResponseParams.HEADERS);
             responseBody = JObjectUtil.getString(response, MessageResponseParams.BODY);
+            contextTimestamp = JObjectUtil.getDatetimeDefaultUtcNow(response, MessageCommonParams.CONTEXT_TIMESTAMP);
         }
 
         public string eventType { get; set; }
@@ -55,6 +58,7 @@ namespace ApimEventProcessor
         public string statusCode { get; set; }
         public string responseHeaders { get; set; }
         public string responseBody { get; set; }
+        public DateTime contextTimestamp { get; set; }
     }
  
     /// <summary>
@@ -72,6 +76,7 @@ namespace ApimEventProcessor
         public HttpResponseMessage HttpResponseMessage { get; set; }
         public string ContextRequestUser {get; set;}
         public string ContextRequestIpAddress {get; set;}
+        public DateTime ContextTimestamp {get; set;}
 
         public static HttpMessage Parse(Stream stream)
         {
@@ -130,10 +135,12 @@ namespace ApimEventProcessor
                     request.Content = new StringContent(mo_req.requestBody);
                     httpMessage.ContextRequestIpAddress = mo_req.ipAddress;
                     httpMessage.ContextRequestUser = mo_req.contextRequestUser;
+                    httpMessage.ContextTimestamp = mo_req.contextTimestamp;
                 } else {
                     httpMessage.IsRequest = false;
                     MoesifResponse mo_res = new MoesifResponse(jsonObject);
                     httpMessage.MessageId = Guid.Parse(mo_res.messageId);
+                    httpMessage.ContextTimestamp = mo_res.contextTimestamp;
                     response.StatusCode = (HttpStatusCode) Convert.ToInt32(mo_res.statusCode);
                     response.Content = new StringContent(mo_res.responseBody);
                     TransformResponseHeaders(response, mo_res.responseHeaders);
@@ -193,6 +200,23 @@ namespace ApimEventProcessor
             }
             catch (Exception){}
             return o;
+        }
+
+        public static DateTime getDatetimeDefaultUtcNow(JObject j, String key)
+        {
+            DateTime v = DateTime.UtcNow;
+            try
+            {
+                ensureContainsKey(j, key);
+                JToken dtVal = j[key];
+                switch (dtVal.Type) {
+                    case JTokenType.Date:
+                        v = (DateTime) dtVal;
+                        break;
+                }
+            }
+            catch (Exception){}
+            return v;
         }
 
         public static Boolean containsKeyWithNonEmptyString(JObject j, String key)

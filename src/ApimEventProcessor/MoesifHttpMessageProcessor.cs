@@ -75,7 +75,7 @@ namespace ApimEventProcessor
             try {
                 if (message.HttpRequestMessage != null){
                     _Logger.LogDebug("Received [request] with messageId: [" + message.MessageId + "]");
-                    message.HttpRequestMessage.Properties.Add(RequestTimeName, DateTime.UtcNow);
+                    message.HttpRequestMessage.Properties.Add(RequestTimeName, message.ContextTimestamp);
                     requestsCache.TryAdd(message.MessageId, message);
                 }
                 if (message.HttpResponseMessage != null){
@@ -215,7 +215,7 @@ namespace ApimEventProcessor
             var reqBodyWrapper = BodyUtil.Serialize(reqBody);
             EventRequestModel moesifRequest = new EventRequestModel()
             {
-                Time = (DateTime) h.Properties[RequestTimeName],
+                Time = request.ContextTimestamp,
                 Uri = h.RequestUri.OriginalString,
                 Verb = h.Method.ToString(),
                 Headers = reqHeaders,
@@ -238,7 +238,7 @@ namespace ApimEventProcessor
             var respBodyWrapper = BodyUtil.Serialize(respBody);
             EventResponseModel moesifResponse = new EventResponseModel()
             {
-                Time = DateTime.UtcNow,
+                Time = response.ContextTimestamp,
                 Status = (int) h.StatusCode,
                 IpAddress = null,
                 Headers = respHeaders,
