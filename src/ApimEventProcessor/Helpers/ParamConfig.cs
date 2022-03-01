@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 
 namespace ApimEventProcessor.Helpers
 {
@@ -49,7 +50,13 @@ namespace ApimEventProcessor.Helpers
         // Frequency at which Moesif configuration is fetched.
         public const int CONFIG_FETCH_INTERVAL_MINUTES = 5;
         
-    }    
+    }
+
+    public static class MoesifApiConfig
+    {
+        // version specified in AssemblyInfo.cs
+        public static String USER_AGENT = "moesif azure-apim/" + Assembly.GetExecutingAssembly().FullName.ToString();
+    }
     
     class ParamConfig
     {

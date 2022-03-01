@@ -40,18 +40,21 @@ namespace ApimEventProcessor
         
         public MoesifHttpMessageProcessor(ILogger logger)
         {
+            _Logger = logger;
+            _Logger.LogDebug("MoesifHttpMessageProcessor start..");
             var appId = ParamConfig.loadNonEmpty(MoesifAppParamNames.APP_ID);
-            _MoesifClient = new MoesifApiClient(appId);
+            _MoesifClient = new MoesifApiClient(appId, MoesifApiConfig.USER_AGENT);
             _SessionTokenKey = ParamConfig.loadDefaultEmpty(MoesifAppParamNames.SESSION_TOKEN);
             _ApiVersion = ParamConfig.loadDefaultEmpty(MoesifAppParamNames.API_VERSION);
-            _Logger = logger;
             ScheduleWorkerToFetchConfig();
+            _Logger.LogDebug("MoesifHttpMessageProcessor started");
         }
 
         private void ScheduleWorkerToFetchConfig()
         {
+            _Logger.LogDebug("Schedule Worker To Fetch Config");
             try {
-                new Thread(async () =>
+                var t = new Thread(async () =>
                 {
                     Thread.CurrentThread.IsBackground = true;
                     lastWorkerRun = DateTime.UtcNow;
@@ -61,7 +64,9 @@ namespace ApimEventProcessor
                     {
                         (configETag, samplingPercentage, lastUpdatedTime) = appConfig.parseConfiguration(config, _Logger);
                     }
-                }).Start();
+                });
+                t.Start();
+                _Logger.LogDebug("Schedule Worker To Fetch Config - thread started");
             } catch (Exception ex) {
                 _Logger.LogError("Error while parsing application configuration on initialization - " + ex.ToString());
             }
@@ -75,7 +80,7 @@ namespace ApimEventProcessor
             try {
                 if (message.HttpRequestMessage != null){
                     _Logger.LogDebug("Received [request] with messageId: [" + message.MessageId + "]");
-                    message.HttpRequestMessage.Properties.Add(RequestTimeName, DateTime.UtcNow);
+                    message.HttpRequestMessage.Properties.Add(RequestTimeName, message.ContextTimestamp);
                     requestsCache.TryAdd(message.MessageId, message);
                 }
                 if (message.HttpResponseMessage != null){
@@ -215,7 +220,7 @@ namespace ApimEventProcessor
             var reqBodyWrapper = BodyUtil.Serialize(reqBody);
             EventRequestModel moesifRequest = new EventRequestModel()
             {
-                Time = (DateTime) h.Properties[RequestTimeName],
+                Time = request.ContextTimestamp,
                 Uri = h.RequestUri.OriginalString,
                 Verb = h.Method.ToString(),
                 Headers = reqHeaders,
@@ -238,7 +243,7 @@ namespace ApimEventProcessor
             var respBodyWrapper = BodyUtil.Serialize(respBody);
             EventResponseModel moesifResponse = new EventResponseModel()
             {
-                Time = DateTime.UtcNow,
+                Time = response.ContextTimestamp,
                 Status = (int) h.StatusCode,
                 IpAddress = null,
                 Headers = respHeaders,
