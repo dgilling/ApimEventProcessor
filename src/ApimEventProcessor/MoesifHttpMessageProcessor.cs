@@ -40,18 +40,21 @@ namespace ApimEventProcessor
         
         public MoesifHttpMessageProcessor(ILogger logger)
         {
+            _Logger = logger;
+            _Logger.LogDebug("MoesifHttpMessageProcessor start..");
             var appId = ParamConfig.loadNonEmpty(MoesifAppParamNames.APP_ID);
             _MoesifClient = new MoesifApiClient(appId, MoesifApiConfig.USER_AGENT);
             _SessionTokenKey = ParamConfig.loadDefaultEmpty(MoesifAppParamNames.SESSION_TOKEN);
             _ApiVersion = ParamConfig.loadDefaultEmpty(MoesifAppParamNames.API_VERSION);
-            _Logger = logger;
             ScheduleWorkerToFetchConfig();
+            _Logger.LogDebug("MoesifHttpMessageProcessor started");
         }
 
         private void ScheduleWorkerToFetchConfig()
         {
+            _Logger.LogDebug("Schedule Worker To Fetch Config");
             try {
-                new Thread(async () =>
+                var t = new Thread(async () =>
                 {
                     Thread.CurrentThread.IsBackground = true;
                     lastWorkerRun = DateTime.UtcNow;
@@ -61,7 +64,9 @@ namespace ApimEventProcessor
                     {
                         (configETag, samplingPercentage, lastUpdatedTime) = appConfig.parseConfiguration(config, _Logger);
                     }
-                }).Start();
+                });
+                t.Start();
+                _Logger.LogDebug("Schedule Worker To Fetch Config - thread started");
             } catch (Exception ex) {
                 _Logger.LogError("Error while parsing application configuration on initialization - " + ex.ToString());
             }

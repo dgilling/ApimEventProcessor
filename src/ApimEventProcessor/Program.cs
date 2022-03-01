@@ -28,6 +28,7 @@ namespace ApimEventProcessor
             // Create connection string for azure storage account to store checkpoints
             string storageConnectionString = makeStorageAccountConnString(storageAccountName,
                                                                             storageAccountKey);
+            logger.LogDebug("Storage Account: " + storageAccountName);
             string eventProcessorHostName = Guid.NewGuid().ToString();
             var eventProcessorHost = new EventProcessorHost(
                                                 eventProcessorHostName,
@@ -35,7 +36,7 @@ namespace ApimEventProcessor
                                                 eventHubConsumerGroupName,
                                                 eventHubConnectionString,
                                                 storageConnectionString);
-            logger.LogDebug("Registering EventProcessor...");
+            logger.LogInfo("Registering EventProcessor...");
             var httpMessageProcessor = new MoesifHttpMessageProcessor(logger);
             eventProcessorHost.RegisterEventProcessorFactoryAsync(
                 new ApimHttpEventProcessorFactory(httpMessageProcessor, logger));
