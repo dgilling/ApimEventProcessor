@@ -19,11 +19,15 @@ namespace ApimEventProcessor
         {
             _HttpMessageProcessor = httpMessageProcessor;
             _Logger = logger;
+            _Logger.LogDebug("Initialize ApimHttpEventProcessorFactory");
         }
 
         public IEventProcessor CreateEventProcessor(PartitionContext context)
         {
-            return new ApimEventProcessor(_HttpMessageProcessor, _Logger);
+            var p = new ApimEventProcessor(_HttpMessageProcessor, _Logger);
+            _Logger.LogDebug("CreateEventProcessors: Consumer Group: " + context.ConsumerGroupName);
+            _Logger.LogDebug("CreateEventProcessors: EventHubPaths: " + context.EventHubPath);
+            return p;
         }
     }
 
@@ -41,12 +45,13 @@ namespace ApimEventProcessor
         {
             _MessageContentProcessor = messageContentProcessor;
             _Logger = logger;
+            _Logger.LogDebug("Initialize ApimEventProcessor");
         }
 
 
         async Task IEventProcessor.ProcessEventsAsync(PartitionContext context, IEnumerable<EventData> messages)
         {
-
+            _Logger.LogDebug("Begin: ProcessEventsAsync");
             foreach (EventData eventData in messages)
             {
                 var evt = displayableEvent(context, eventData);
@@ -75,6 +80,7 @@ namespace ApimEventProcessor
                 await context.CheckpointAsync();
                 this.checkpointStopWatch.Restart();
             }
+            _Logger.LogDebug("End: ProcessEventsAsync");
         }
 
         public static string displayableEvent(PartitionContext context, EventData evt)

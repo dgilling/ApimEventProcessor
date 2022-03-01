@@ -10,6 +10,7 @@ namespace ApimEventProcessor
     {
         public static string EVENT_TYPE = "event_type";
         public static string MESSAGE_ID = "message-id";
+        public static string CONTEXT_TIMESTAMP = "contextTimestamp";
     }
 
     public class MessageRequestParams
