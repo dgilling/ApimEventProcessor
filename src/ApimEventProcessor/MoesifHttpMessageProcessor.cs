@@ -41,7 +41,7 @@ namespace ApimEventProcessor
         public MoesifHttpMessageProcessor(ILogger logger)
         {
             var appId = ParamConfig.loadNonEmpty(MoesifAppParamNames.APP_ID);
-            _MoesifClient = new MoesifApiClient(appId);
+            _MoesifClient = new MoesifApiClient(appId, MoesifApiConfig.USER_AGENT);
             _SessionTokenKey = ParamConfig.loadDefaultEmpty(MoesifAppParamNames.SESSION_TOKEN);
             _ApiVersion = ParamConfig.loadDefaultEmpty(MoesifAppParamNames.API_VERSION);
             _Logger = logger;
