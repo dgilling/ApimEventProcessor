@@ -10,6 +10,9 @@ namespace ApimEventProcessor.Helpers
         public const string APP_ID = "APIMEVENTS-MOESIF-APPLICATION-ID";
 
         //Optional
+        public const string BASE_URI = "APIMEVENTS-MOESIF-BASE_URI";
+
+        //Optional
         public const string SESSION_TOKEN = "APIMEVENTS-MOESIF-SESSION-TOKEN";
 
         //Optional
