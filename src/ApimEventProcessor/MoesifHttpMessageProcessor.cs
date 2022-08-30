@@ -43,6 +43,12 @@ namespace ApimEventProcessor
             _Logger = logger;
             _Logger.LogDebug("MoesifHttpMessageProcessor start..");
             var appId = ParamConfig.loadNonEmpty(MoesifAppParamNames.APP_ID);
+
+            // Set the base URI from env var, if defined.
+            var baseUri = ParamConfig.loadWithDefault(MoesifAppParamNames.BASE_URI, Moesif.Api.Configuration.BaseUri);
+            Moesif.Api.Configuration.BaseUri = baseUri;
+            _Logger.LogInfo("Moesif Configuration BaseUri : ['{0}']", Moesif.Api.Configuration.BaseUri);
+
             _MoesifClient = new MoesifApiClient(appId, MoesifApiConfig.USER_AGENT);
             _SessionTokenKey = ParamConfig.loadDefaultEmpty(MoesifAppParamNames.SESSION_TOKEN);
             _ApiVersion = ParamConfig.loadDefaultEmpty(MoesifAppParamNames.API_VERSION);

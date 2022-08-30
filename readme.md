@@ -11,6 +11,7 @@ In order to run this sample you will need a number Environment variables configu
 | APIMEVENTS-STORAGEACCOUNT-NAME | Azure Storage Account used for keeping track of what events have been read |
 | APIMEVENTS-STORAGEACCOUNT-KEY | Key for Azure Storage Account|
 | APIMEVENTS-MOESIF-APPLICATION-ID | Your Moesif Application Id(aka Collector Application Id) can be found in the Moesif Portal.<br> After signing up for a Moesif account, your Moesif Application Id will be displayed during the onboarding steps<br> Or any time by logging into the Moesif Portal, click on the top right menu, and then clicking ApiKeys or Installation. |  
+| APIMEVENTS-MOESIF-BASE_URI | optional (_string_) : A local proxy hostname when sending traffic via secure proxy. Please set this field when using secure proxy. For more details, refer [secure proxy documentation.](https://www.moesif.com/docs/platform/secure-proxy/#2-configure-moesif-sdk) |
 | APIMEVENTS-MOESIF-SESSION-TOKEN | Request Header Key containing user's API Token such as "Authorization" or "X-Api-Token"|
 | APIMEVENTS-MOESIF-API-VERSION | API Version to tag the request with such as "v1" or "1.2.1" |
 | APIMEVENTS-LOG-LEVEL | Optional: default log level is `warn`. Set this env varilable to `info` or `debug` to see more logs. Set either in `run.bat` or `Azure app service setting configuration` |
