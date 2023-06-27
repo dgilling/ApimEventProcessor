@@ -36,6 +36,11 @@ namespace ApimEventProcessor.Helpers
 
         // Required
         public const string STORAGEACCOUNT_KEY = "APIMEVENTS-STORAGEACCOUNT-KEY";
+
+        // Optional: use default if not set
+        // see https://learn.microsoft.com/en-us/dotnet/api/microsoft.servicebus.messaging.eventprocessoroptions?view=azure-dotnet#properties
+        // override the default EventHub MaxBatchSize value
+        public const string EVENTHUB_MAX_BATCH_SIZE = "APIMEVENTS-EVENTHUB-MAX-BATCH-SIZE";
     }
 
     public static class AppExecuteParams
@@ -48,11 +53,13 @@ namespace ApimEventProcessor.Helpers
     public static class RunParams
     {
         // Frequency at which events are checkpointed to Azure Storage.
-        public const int CHECKPOINT_MINIMUM_INTERVAL_MINUTES = 5;
+        public const int CHECKPOINT_MINIMUM_INTERVAL_MINUTES = 1;
         
         // Frequency at which Moesif configuration is fetched.
         public const int CONFIG_FETCH_INTERVAL_MINUTES = 5;
         
+        // EventHub MaxBatchSize value default is 10, a bit too small.
+        public const int EVENTHUB_MAX_BATCH_SIZE_DEFAULT = 100;
     }
 
     public static class MoesifApiConfig
