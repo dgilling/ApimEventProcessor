@@ -15,6 +15,7 @@ In order to run this sample you will need a number Environment variables configu
 | APIMEVENTS-MOESIF-SESSION-TOKEN | Request Header Key containing user's API Token such as "Authorization" or "X-Api-Token"|
 | APIMEVENTS-MOESIF-API-VERSION | API Version to tag the request with such as "v1" or "1.2.1" |
 | APIMEVENTS-LOG-LEVEL | Optional: default log level is `warn`. Set this env varilable to `info` or `debug` to see more logs. Set either in `run.bat` or `Azure app service setting configuration` |
+| APIMEVENTS-EVENTHUB-MAX-BATCH-SIZE | Optional: The [Eventhub MaxBatchSize](https://learn.microsoft.com/en-us/dotnet/api/microsoft.azure.eventhubs.processor.eventprocessoroptions.maxbatchsize?view=azure-dotnet) value setting.. indicating number of events to fetch from eventhub. Larger batches increase throughput. Default: `100`. Try values of `100` - `500`|
 |  |  |
 
 The sample, as is, writes the HTTP messages to the Moesif API Analytics, however, by creating a new implementation of `IHttpMessageProcessor` it is trivial to change where the HTTP messages are relayed.
