@@ -78,22 +78,24 @@ namespace ApimEventProcessor
             }
         }
 
+        // if message is not null, add to cache/dont send. If message is null.. only attempt to send
         public async Task ProcessHttpMessage(HttpMessage message)
         {
             // message will probably contain either HttpRequestMessage or HttpResponseMessage
             // So we cache both request and response and cache them. 
             // Note, response message might be processed before request
             try {
-                if (message.HttpRequestMessage != null){
+                if (message != null && message.HttpRequestMessage != null){
                     _Logger.LogDebug("Received [request] with messageId: [" + message.MessageId + "]");
                     message.HttpRequestMessage.Properties.Add(RequestTimeName, message.ContextTimestamp);
                     requestsCache.TryAdd(message.MessageId, message);
                 }
-                if (message.HttpResponseMessage != null){
+                if (message != null && message.HttpResponseMessage != null){
                     _Logger.LogDebug("Received [response] with messageId: [" + message.MessageId + "]");
                     responsesCache.TryAdd(message.MessageId, message);
                 }
-                await SendCompletedMessagesToMoesif();
+                if (message == null)
+                    await SendCompletedMessagesToMoesif();
             }
             catch (Exception ex) {
                  _Logger.LogError("Error Processing and sending message to Moesif:  " + ex.Message);
@@ -120,13 +122,22 @@ namespace ApimEventProcessor
         public Dictionary<Guid, KeyValuePair<HttpMessage, HttpMessage>> RemoveCompletedMessages(){
             Dictionary<Guid, KeyValuePair<HttpMessage, HttpMessage>> messages = new Dictionary<Guid, KeyValuePair<HttpMessage, HttpMessage>>();
             lock(qLock){
-                foreach(Guid messageId in requestsCache.Keys.Intersect(responsesCache.Keys))
+                //var reqCacheSizeBefore = requestsCache.Count;
+                //var respCacheSizeBefore = responsesCache.Count;
+                var commonMessageIds = requestsCache.Keys.Intersect(responsesCache.Keys);
+                foreach(Guid messageId in commonMessageIds)
                 {
                     HttpMessage reqm, respm;
                     requestsCache.TryRemove(messageId, out reqm);
                     responsesCache.TryRemove(messageId, out respm);
-                    messages.Add(messageId, new KeyValuePair<HttpMessage, HttpMessage>(reqm, respm));
+                    if (null != reqm && null != respm)
+                        messages.Add(messageId, new KeyValuePair<HttpMessage, HttpMessage>(reqm, respm));
                 }
+                //if (commonMessageIds.LongCount() > 0) {
+                //    var reqDelta = reqCacheSizeBefore - requestsCache.Count;
+                //    var respCache = respCacheSizeBefore - responsesCache.Count;
+                //    _Logger.LogInfo($"Before/After CommonMessages:[{messages.Count}|{reqDelta}|{respCache}] RequestsCache: [{reqCacheSizeBefore}/{requestsCache.Count}] ResponsesCache: [{respCacheSizeBefore}/{responsesCache.Count}]");
+                //}
             }
             return messages;
         }
