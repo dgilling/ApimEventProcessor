@@ -19,11 +19,15 @@ namespace ApimEventProcessor
         {
             _HttpMessageProcessor = httpMessageProcessor;
             _Logger = logger;
+            _Logger.LogDebug("Initialize ApimHttpEventProcessorFactory");
         }
 
         public IEventProcessor CreateEventProcessor(PartitionContext context)
         {
-            return new ApimEventProcessor(_HttpMessageProcessor, _Logger);
+            var p = new ApimEventProcessor(_HttpMessageProcessor, _Logger);
+            _Logger.LogDebug("CreateEventProcessors: Consumer Group: " + context.ConsumerGroupName);
+            _Logger.LogDebug("CreateEventProcessors: EventHubPaths: " + context.EventHubPath);
+            return p;
         }
     }
 
@@ -36,25 +40,34 @@ namespace ApimEventProcessor
         Stopwatch checkpointStopWatch;
         private ILogger _Logger;
         private IHttpMessageProcessor _MessageContentProcessor;
+        private int MAX_EVENTS_ADD_TOCACHE_BEFORE_SEND = 100;
 
         public ApimEventProcessor(IHttpMessageProcessor messageContentProcessor, ILogger logger)
         {
             _MessageContentProcessor = messageContentProcessor;
             _Logger = logger;
+            _Logger.LogDebug("Initialize ApimEventProcessor");
         }
 
 
         async Task IEventProcessor.ProcessEventsAsync(PartitionContext context, IEnumerable<EventData> messages)
         {
-
+            _Logger.LogDebug($"Begin: ProcessEventsAsync. PartitionId: {context.Lease.PartitionId}");
+            var processedCount = 0;
             foreach (EventData eventData in messages)
             {
                 var evt = displayableEvent(context, eventData);
-                _Logger.LogInfo("Event received: " + evt);
+                _Logger.LogDebug("Event received: " + evt);
                 try
                 {
                     var httpMessage = HttpMessage.Parse(eventData.GetBodyStream());
-                    await _MessageContentProcessor.ProcessHttpMessage(httpMessage);
+                    await _MessageContentProcessor.ProcessHttpMessage(httpMessage); // just cache dont send
+                    processedCount += 1;
+                    var isSend = processedCount >= MAX_EVENTS_ADD_TOCACHE_BEFORE_SEND;
+                    if (isSend) {
+                        processedCount = 0;
+                        await _MessageContentProcessor.ProcessHttpMessage(null); // dont add just send
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -62,19 +75,18 @@ namespace ApimEventProcessor
                     _Logger.LogError("Error: " + evt + " - " + ex.Message);
                 }
             }
+            await _MessageContentProcessor.ProcessHttpMessage(null); // dont add just send
 
             //Call checkpoint every CHECKPOINT_MINIMUM_INTERVAL_MINUTES minutes,
             // so that worker can resume processing from that time back if it restarts.
             if (this.checkpointStopWatch.Elapsed > TimeSpan.FromMinutes(RunParams.CHECKPOINT_MINIMUM_INTERVAL_MINUTES))
             {
-                _Logger.LogInfo("Saving checkpoint. Actual: ["
-                                + this.checkpointStopWatch.Elapsed
-                                + "] mins. minimum configured is : ["
-                                + RunParams.CHECKPOINT_MINIMUM_INTERVAL_MINUTES
-                                + "] mins");
+                _Logger.LogInfo($"Saving checkpoint for partition:[{context.Lease.PartitionId}] offset[{context.Lease.Offset}] seq[{context.Lease.SequenceNumber}] owner[{context.Lease.Owner}]. "
+                                + $"Actual elapsed time: [{this.checkpointStopWatch.Elapsed}] mins. minimum configured is : [{RunParams.CHECKPOINT_MINIMUM_INTERVAL_MINUTES}] mins");
                 await context.CheckpointAsync();
                 this.checkpointStopWatch.Restart();
             }
+            _Logger.LogDebug($"End: ProcessEventsAsync. PartitionId: {context.Lease.PartitionId}");
         }
 
         public static string displayableEvent(PartitionContext context, EventData evt)
@@ -87,7 +99,9 @@ namespace ApimEventProcessor
                                                 evt.Offset,
                                                 evt.PartitionKey);
             }
-            catch (Exception){}
+            catch (Exception ex){
+                Console.WriteLine("Exception in displayableEvent: " + ex.Message);
+            }
             return t;
         }
 

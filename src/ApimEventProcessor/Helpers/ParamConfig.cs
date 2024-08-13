@@ -1,32 +1,74 @@
 using System;
+using System.Reflection;
 
 namespace ApimEventProcessor.Helpers
 {
     // Environment varilables for configuring Moesif
     public static class MoesifAppParamNames
     {
+        // Required
         public const string APP_ID = "APIMEVENTS-MOESIF-APPLICATION-ID";
+
+        //Optional
+        public const string BASE_URI = "APIMEVENTS-MOESIF-BASE_URI";
+
+        //Optional
         public const string SESSION_TOKEN = "APIMEVENTS-MOESIF-SESSION-TOKEN";
+
+        //Optional
         public const string API_VERSION = "APIMEVENTS-MOESIF-API-VERSION";
+
+        //Optional
+        public const string CONFIG_FETCH_INTERVAL_MINS = "APIMEVENTS-MOESIF-CONFIG-FETCH-INTERVAL";
     }
 
     // Environment varilables for configuring Azure Eventhub and storage account
     public static class AzureAppParamNames
     {
+        // Required
         public const string EVENTHUB_CONN_STRING = "APIMEVENTS-EVENTHUB-CONNECTIONSTRING";
+
+        // Required
         public const string EVENTHUB_NAME = "APIMEVENTS-EVENTHUB-NAME";
+
+        // Required
         public const string STORAGEACCOUNT_NAME = "APIMEVENTS-STORAGEACCOUNT-NAME";
+
+        // Required
         public const string STORAGEACCOUNT_KEY = "APIMEVENTS-STORAGEACCOUNT-KEY";
+
+        // Optional: use default if not set
+        // see https://learn.microsoft.com/en-us/dotnet/api/microsoft.servicebus.messaging.eventprocessoroptions?view=azure-dotnet#properties
+        // override the default EventHub MaxBatchSize value
+        public const string EVENTHUB_MAX_BATCH_SIZE = "APIMEVENTS-EVENTHUB-MAX-BATCH-SIZE";
+    }
+
+    public static class AppExecuteParams
+    {
+        // Optional:
+        // This log level May be configured in azure web app config env vars
+        public const string APIMEVENTS_LOG_LEVEL = "APIMEVENTS-LOG-LEVEL";
     }
 
     public static class RunParams
     {
         // Frequency at which events are checkpointed to Azure Storage.
-        public const int CHECKPOINT_MINIMUM_INTERVAL_MINUTES = 5;
+        public const int CHECKPOINT_MINIMUM_INTERVAL_MINUTES = 1;
         
         // Frequency at which Moesif configuration is fetched.
         public const int CONFIG_FETCH_INTERVAL_MINUTES = 5;
-    }    class ParamConfig
+        
+        // EventHub MaxBatchSize value default is 10, a bit too small.
+        public const int EVENTHUB_MAX_BATCH_SIZE_DEFAULT = 100;
+    }
+
+    public static class MoesifApiConfig
+    {
+        // version specified in AssemblyInfo.cs
+        public static String USER_AGENT = "moesif azure-apim/" + Assembly.GetExecutingAssembly().FullName.ToString();
+    }
+    
+    class ParamConfig
     {
         public static string load(string v)
         {
@@ -36,10 +78,28 @@ namespace ApimEventProcessor.Helpers
 
         public static string loadDefaultEmpty(string v)
         {
+            return loadWithDefault(v, "");
+        }
+
+        public static string loadWithDefault(string v, string defaultVal)
+        {
             var val = load(v);
             if (string.IsNullOrWhiteSpace(val))
-                val = "";
+                val = defaultVal;
             return val.Trim();
+        }
+
+        public static int loadWithDefault(string v, int defaultVal)
+        {
+            int ival = defaultVal;
+            try
+            {
+                var val = loadWithDefault(v, "");
+                if (!string.IsNullOrWhiteSpace(val) && (Int32.Parse(val) > 0 ))
+                    ival = Int32.Parse(val);
+            }
+            catch (Exception){}
+            return ival;
         }
 
         public static string loadNonEmpty(string varName)
@@ -50,5 +110,4 @@ namespace ApimEventProcessor.Helpers
             return val.Trim();
         }
     }
-
 }

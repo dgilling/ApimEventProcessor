@@ -40,18 +40,27 @@ namespace ApimEventProcessor
         
         public MoesifHttpMessageProcessor(ILogger logger)
         {
+            _Logger = logger;
+            _Logger.LogDebug("MoesifHttpMessageProcessor start..");
             var appId = ParamConfig.loadNonEmpty(MoesifAppParamNames.APP_ID);
-            _MoesifClient = new MoesifApiClient(appId);
+
+            // Set the base URI from env var, if defined.
+            var baseUri = ParamConfig.loadWithDefault(MoesifAppParamNames.BASE_URI, Moesif.Api.Configuration.BaseUri);
+            Moesif.Api.Configuration.BaseUri = baseUri;
+            _Logger.LogInfo("Moesif Configuration BaseUri : ['{0}']", Moesif.Api.Configuration.BaseUri);
+
+            _MoesifClient = new MoesifApiClient(appId, MoesifApiConfig.USER_AGENT);
             _SessionTokenKey = ParamConfig.loadDefaultEmpty(MoesifAppParamNames.SESSION_TOKEN);
             _ApiVersion = ParamConfig.loadDefaultEmpty(MoesifAppParamNames.API_VERSION);
-            _Logger = logger;
             ScheduleWorkerToFetchConfig();
+            _Logger.LogDebug("MoesifHttpMessageProcessor started");
         }
 
         private void ScheduleWorkerToFetchConfig()
         {
+            _Logger.LogDebug("Schedule Worker To Fetch Config");
             try {
-                new Thread(async () =>
+                var t = new Thread(async () =>
                 {
                     Thread.CurrentThread.IsBackground = true;
                     lastWorkerRun = DateTime.UtcNow;
@@ -61,28 +70,32 @@ namespace ApimEventProcessor
                     {
                         (configETag, samplingPercentage, lastUpdatedTime) = appConfig.parseConfiguration(config, _Logger);
                     }
-                }).Start();
+                });
+                t.Start();
+                _Logger.LogDebug("Schedule Worker To Fetch Config - thread started");
             } catch (Exception ex) {
                 _Logger.LogError("Error while parsing application configuration on initialization - " + ex.ToString());
             }
         }
 
+        // if message is not null, add to cache/dont send. If message is null.. only attempt to send
         public async Task ProcessHttpMessage(HttpMessage message)
         {
             // message will probably contain either HttpRequestMessage or HttpResponseMessage
             // So we cache both request and response and cache them. 
             // Note, response message might be processed before request
             try {
-                if (message.HttpRequestMessage != null){
+                if (message != null && message.HttpRequestMessage != null){
                     _Logger.LogDebug("Received [request] with messageId: [" + message.MessageId + "]");
-                    message.HttpRequestMessage.Properties.Add(RequestTimeName, DateTime.UtcNow);
+                    message.HttpRequestMessage.Properties.Add(RequestTimeName, message.ContextTimestamp);
                     requestsCache.TryAdd(message.MessageId, message);
                 }
-                if (message.HttpResponseMessage != null){
+                if (message != null && message.HttpResponseMessage != null){
                     _Logger.LogDebug("Received [response] with messageId: [" + message.MessageId + "]");
                     responsesCache.TryAdd(message.MessageId, message);
                 }
-                await SendCompletedMessagesToMoesif();
+                if (message == null)
+                    await SendCompletedMessagesToMoesif();
             }
             catch (Exception ex) {
                  _Logger.LogError("Error Processing and sending message to Moesif:  " + ex.Message);
@@ -99,7 +112,7 @@ namespace ApimEventProcessor
             var completedMessages = RemoveCompletedMessages();
             if (completedMessages.Count > 0)
             {
-                _Logger.LogDebug("Sending completed Messages to Moesif. Count: [" + completedMessages.Count + "]");
+                _Logger.LogInfo("Sending completed Messages to Moesif. Count: [" + completedMessages.Count + "]");
                 var moesifEvents = await BuildMoesifEvents(completedMessages);
                 // Send async to Moesif. To send synchronously, use CreateEventsBatch instead
                 await _MoesifClient.Api.CreateEventsBatchAsync(moesifEvents);
@@ -109,13 +122,22 @@ namespace ApimEventProcessor
         public Dictionary<Guid, KeyValuePair<HttpMessage, HttpMessage>> RemoveCompletedMessages(){
             Dictionary<Guid, KeyValuePair<HttpMessage, HttpMessage>> messages = new Dictionary<Guid, KeyValuePair<HttpMessage, HttpMessage>>();
             lock(qLock){
-                foreach(Guid messageId in requestsCache.Keys.Intersect(responsesCache.Keys))
+                //var reqCacheSizeBefore = requestsCache.Count;
+                //var respCacheSizeBefore = responsesCache.Count;
+                var commonMessageIds = requestsCache.Keys.Intersect(responsesCache.Keys);
+                foreach(Guid messageId in commonMessageIds)
                 {
                     HttpMessage reqm, respm;
                     requestsCache.TryRemove(messageId, out reqm);
                     responsesCache.TryRemove(messageId, out respm);
-                    messages.Add(messageId, new KeyValuePair<HttpMessage, HttpMessage>(reqm, respm));
+                    if (null != reqm && null != respm)
+                        messages.Add(messageId, new KeyValuePair<HttpMessage, HttpMessage>(reqm, respm));
                 }
+                //if (commonMessageIds.LongCount() > 0) {
+                //    var reqDelta = reqCacheSizeBefore - requestsCache.Count;
+                //    var respCache = respCacheSizeBefore - responsesCache.Count;
+                //    _Logger.LogInfo($"Before/After CommonMessages:[{messages.Count}|{reqDelta}|{respCache}] RequestsCache: [{reqCacheSizeBefore}/{requestsCache.Count}] ResponsesCache: [{respCacheSizeBefore}/{responsesCache.Count}]");
+                //}
             }
             return messages;
         }
@@ -156,7 +178,10 @@ namespace ApimEventProcessor
 
         public void runConfigFreshnessCheck()
         {
-            if (lastWorkerRun.AddMinutes(RunParams.CONFIG_FETCH_INTERVAL_MINUTES) < DateTime.UtcNow)
+            int fetchInterval = ParamConfig.loadWithDefault(
+                                    MoesifAppParamNames.CONFIG_FETCH_INTERVAL_MINS,
+                                    RunParams.CONFIG_FETCH_INTERVAL_MINUTES);
+            if (lastWorkerRun.AddMinutes(fetchInterval) < DateTime.UtcNow)
             {
                 _Logger.LogDebug("Scheduling worker thread. lastWorkerRun=" + lastWorkerRun.ToString("o"));
                 ScheduleWorkerToFetchConfig();
@@ -173,7 +198,7 @@ namespace ApimEventProcessor
         From Http request and response, construct the moesif EventModel
         */
         public async Task<EventModel> BuildMoesifEvent(HttpMessage request, HttpMessage response){
-            _Logger.LogDebug("Building Moesif event");
+            _Logger.LogDebug("Building Moesif event: [" + request.MessageId + "]");
             EventRequestModel moesifRequest = await genEventRequestModel(request,
                                                                         ReqHeadersName,
                                                                         RequestTimeName,
@@ -183,10 +208,12 @@ namespace ApimEventProcessor
             string skey = safeGetHeaderFirstOrDefault(request, _SessionTokenKey);
             string userId = safeGetOrNull(request, UserIdName);
             string companyId = safeGetOrNull(request, CompanyIdName);
+            ContextModel context = genContext(request.ContextRequestUser);
             EventModel moesifEvent = new EventModel()
             {
                 Request = moesifRequest,
                 Response = moesifResponse,
+                Context = context,
                 SessionToken = skey,
                 Tags = null,
                 UserId = userId,
@@ -210,12 +237,12 @@ namespace ApimEventProcessor
             var reqBodyWrapper = BodyUtil.Serialize(reqBody);
             EventRequestModel moesifRequest = new EventRequestModel()
             {
-                Time = (DateTime) h.Properties[RequestTimeName],
+                Time = request.ContextTimestamp,
                 Uri = h.RequestUri.OriginalString,
                 Verb = h.Method.ToString(),
                 Headers = reqHeaders,
                 ApiVersion = _ApiVersion,
-                IpAddress = null,
+                IpAddress = request.ContextRequestIpAddress,
                 Body = reqBodyWrapper.Item1,
                 TransferEncoding = reqBodyWrapper.Item2
             };
@@ -233,9 +260,9 @@ namespace ApimEventProcessor
             var respBodyWrapper = BodyUtil.Serialize(respBody);
             EventResponseModel moesifResponse = new EventResponseModel()
             {
-                Time = DateTime.UtcNow,
+                Time = response.ContextTimestamp,
                 Status = (int) h.StatusCode,
-                IpAddress = Environment.MachineName,
+                IpAddress = null,
                 Headers = respHeaders,
                 Body = respBodyWrapper.Item1,
                 TransferEncoding = respBodyWrapper.Item2
@@ -258,7 +285,7 @@ namespace ApimEventProcessor
                                             string propertyName)
         {
             var p = request.HttpRequestMessage.Properties;
-            return p[propertyName] != null
+            return (p.ContainsKey(propertyName) && p[propertyName] != null)
                     ? (string) p[propertyName] 
                     : null;
         }
@@ -290,6 +317,30 @@ namespace ApimEventProcessor
                             .ToEnumerable()
                             .ToList()
                             .Aggregate((i, j) => i + ", " + j));
+        }
+
+        private ContextModel genContext(String b64EncodedStr)
+        {
+            ContextModel context = null;
+            try {
+                if (!string.IsNullOrWhiteSpace(b64EncodedStr)){
+                    var jStr = BodyUtil.b64Decode(b64EncodedStr);
+                    jStr = jStr.Replace("\r\n", "").Replace("\\", "");
+                    if (!(jStr.Trim().Replace(" ", "") == "{}")) // Empty Json
+                    {
+                        ContextUserModel m = ContextUserModel.deserialize(jStr);
+                        if (null != m)
+                        {
+                            context = new ContextModel();
+                            context.User = m;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex){
+                _Logger.LogWarning("Error extracting context.Request.User: " + ex.Message);
+            }
+            return context;
         }
     }
 }

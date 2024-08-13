@@ -56,4 +56,31 @@ namespace ApimEventProcessor
         }
 
     }
+
+    class LogLevelUtil
+    {
+        public static LogLevel getLevelFromString(String desiredLevel, LogLevel defaultLevel)
+        {
+            LogLevel l = defaultLevel;
+            if (matchesStr(desiredLevel, "debug") || matchesStr(desiredLevel, "trace") )
+                l = LogLevel.Debug;
+            else if (matchesStr(desiredLevel, "information"))
+                l = LogLevel.Info;
+            else if (matchesStr(desiredLevel, "warning"))
+                l = LogLevel.Warning;
+            else if (matchesStr(desiredLevel, "error") || matchesStr(desiredLevel, "fatal"))
+                l = LogLevel.Error;
+            return l;
+        }
+
+        private static Boolean matchesStr(String desiredLevel, String match)
+        {
+            Boolean m = false;
+            if (!string.IsNullOrEmpty(desiredLevel))
+                desiredLevel = desiredLevel.Replace("\"", "").Replace("'", "").Trim().ToLower();
+            if (!string.IsNullOrWhiteSpace(desiredLevel))
+                m = match.Trim().ToLower().StartsWith(desiredLevel);
+            return m;
+        }
+    }
 }

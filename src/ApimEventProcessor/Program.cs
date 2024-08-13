@@ -14,8 +14,9 @@ namespace ApimEventProcessor
     {
         static void Main(string[] args)
         {
-            var logger = new ConsoleLogger(LogLevel.Debug);
-            logger.LogInfo("STARTING Moesif API Management Event Processor. Reading environment variables");
+            var infoLogger = new ConsoleLogger(LogLevel.Info);
+            infoLogger.LogInfo("STARTING Moesif API Management Event Processor. Reading environment variables");
+            var logger = GetLogger();
             // Load configuration paramaters from Environment
             string eventHubConnectionString = ParamConfig.loadNonEmpty(AzureAppParamNames.EVENTHUB_CONN_STRING);
             string eventHubName = ParamConfig.loadNonEmpty(AzureAppParamNames.EVENTHUB_NAME); 
@@ -27,6 +28,7 @@ namespace ApimEventProcessor
             // Create connection string for azure storage account to store checkpoints
             string storageConnectionString = makeStorageAccountConnString(storageAccountName,
                                                                             storageAccountKey);
+            logger.LogDebug("Storage Account: " + storageAccountName);
             string eventProcessorHostName = Guid.NewGuid().ToString();
             var eventProcessorHost = new EventProcessorHost(
                                                 eventProcessorHostName,
@@ -34,10 +36,12 @@ namespace ApimEventProcessor
                                                 eventHubConsumerGroupName,
                                                 eventHubConnectionString,
                                                 storageConnectionString);
-            logger.LogDebug("Registering EventProcessor...");
+            logger.LogInfo("Registering EventProcessor...");
             var httpMessageProcessor = new MoesifHttpMessageProcessor(logger);
             eventProcessorHost.RegisterEventProcessorFactoryAsync(
-                new ApimHttpEventProcessorFactory(httpMessageProcessor, logger));
+                new ApimHttpEventProcessorFactory(httpMessageProcessor, logger),
+                buildEventProcessorOptions()
+            );
             
             logger.LogInfo("Process is running. Press enter key to end...");
             Console.ReadLine();
@@ -51,6 +55,41 @@ namespace ApimEventProcessor
         {
             return string.Format("DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1}",
                 storageAccountName, storageAccountKey);
-        }   
+        }
+
+        // Read loglevel from environment, else use system default.
+        // APIMEVENTS_LOG_LEVEL takes priority over DEFAULT_LOG_LEVEL
+        // if neither are configured, use warning as log level.
+        public static ConsoleLogger GetLogger()
+        {
+            var aloglevelparam = ParamConfig.loadDefaultEmpty(AppExecuteParams.APIMEVENTS_LOG_LEVEL);
+            var logLevel = LogLevelUtil.getLevelFromString(aloglevelparam, LogLevel.Warning);
+            var infoLogger = new ConsoleLogger(LogLevel.Info);
+            infoLogger.LogInfo("Setting loglevel to: [ " 
+                                + logLevel.ToString() 
+                                + " ] | '" + AppExecuteParams.APIMEVENTS_LOG_LEVEL + "': [ "
+                                + aloglevelparam 
+                                + " ]"
+                                );
+            var logger = new ConsoleLogger(logLevel);
+            return logger;
+        }
+
+        public static EventProcessorOptions buildEventProcessorOptions()
+        {
+            var infoLogger = new ConsoleLogger(LogLevel.Info);
+            EventProcessorOptions epOptions = new EventProcessorOptions();
+            int maxSizeFromConfig = ParamConfig.loadWithDefault(
+                AzureAppParamNames.EVENTHUB_MAX_BATCH_SIZE,
+                RunParams.EVENTHUB_MAX_BATCH_SIZE_DEFAULT);
+            var oldMaxBatchSize = epOptions.MaxBatchSize;
+            if (maxSizeFromConfig > 0) {
+                epOptions.MaxBatchSize = maxSizeFromConfig;
+                infoLogger.LogInfo($"Overriding the default Eventhub MaxBatchSize. Old default value:[{oldMaxBatchSize}] New value:[{epOptions.MaxBatchSize}]");
+            } else {
+                infoLogger.LogInfo($"Using default Eventhub MaxBatchSize:[{epOptions.MaxBatchSize}] (to override set env var {AzureAppParamNames.EVENTHUB_MAX_BATCH_SIZE})");
+            }
+            return epOptions;
+        }
     }
 }
